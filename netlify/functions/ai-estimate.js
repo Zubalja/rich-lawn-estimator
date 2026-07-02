@@ -32,7 +32,9 @@ exports.handler = async (event) => {
   // directly, billed to your own Anthropic account instead.
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const baseUrl = process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com';
+  console.log('[ai-estimate] ANTHROPIC_API_KEY present:', !!apiKey, '| ANTHROPIC_BASE_URL:', process.env.ANTHROPIC_BASE_URL || '(not set, using direct Anthropic)');
   if (!apiKey) {
+    console.log('[ai-estimate] No key found in environment — check Team settings > AI enablement, and that this deploy happened AFTER enabling it.');
     return {
       statusCode: 500,
       body: JSON.stringify({ error: 'No Anthropic key available. Make sure Netlify AI features are enabled for your team, or add your own ANTHROPIC_API_KEY.' }),
@@ -61,7 +63,11 @@ exports.handler = async (event) => {
     // Pull the live pricing catalog from this same site so the AI only ever
     // recommends real, current services — never invents pricing.
     const siteUrl = process.env.URL || process.env.DEPLOY_URL || '';
+    console.log('[ai-estimate] Fetching catalog from:', `${siteUrl}/catalog.json`);
     const catalogRes = await fetch(`${siteUrl}/catalog.json`);
+    if (!catalogRes.ok) {
+      console.log('[ai-estimate] catalog.json fetch failed, status:', catalogRes.status);
+    }
     const catalog = await catalogRes.json();
     const catalogForPrompt = catalog.categories.flatMap((c) =>
       c.items.map((i) => ({ item_id: i.id, category: c.name, name: i.name, unit: i.unit, description: i.desc }))
@@ -98,6 +104,7 @@ Rules:
       }
     }
 
+    console.log('[ai-estimate] Calling:', `${baseUrl}/v1/messages`);
     const anthropicRes = await fetch(`${baseUrl}/v1/messages`, {
       method: 'POST',
       headers: {
@@ -113,6 +120,10 @@ Rules:
     });
 
     const data = await anthropicRes.json();
+    console.log('[ai-estimate] Response status:', anthropicRes.status, '| ok:', anthropicRes.ok);
+    if (!anthropicRes.ok) {
+      console.log('[ai-estimate] Error body:', JSON.stringify(data));
+    }
 
     if (!anthropicRes.ok) {
       return { statusCode: anthropicRes.status, body: JSON.stringify({ error: data.error?.message || 'AI request failed' }) };
@@ -133,6 +144,7 @@ Rules:
 
     return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(parsed) };
   } catch (err) {
+    console.log('[ai-estimate] Caught error:', err.message, err.stack);
     return { statusCode: 500, body: JSON.stringify({ error: err.message || 'Something went wrong' }) };
   }
 };
