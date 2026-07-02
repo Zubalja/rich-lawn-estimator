@@ -1,12 +1,18 @@
 // netlify/functions/ai-estimate.js
 //
 // Called from the browser at /.netlify/functions/ai-estimate
-// Keeps the Anthropic API key on the server — never exposed to the client.
 //
-// SETUP REQUIRED (one time, in the Netlify dashboard):
-//   Site settings -> Environment variables -> Add variable
-//   Key:   ANTHROPIC_API_KEY
-//   Value: your key from https://console.anthropic.com/settings/keys
+// CURRENT SETUP: using Netlify's built-in AI Gateway. No API key or account
+// setup needed — Netlify auto-injects a working Anthropic key at runtime,
+// and usage is billed through your Netlify credits alongside everything else.
+//
+// To switch to billing your own Anthropic account directly later:
+//   1. Get a key from https://console.anthropic.com/settings/keys
+//   2. In Netlify: Project configuration > Environment variables > Add a variable
+//      Key: ANTHROPIC_API_KEY   Value: your key
+//   3. Trigger a new deploy
+// No code changes needed for that switch — this file already falls back to
+// calling Anthropic directly whenever ANTHROPIC_API_KEY is set manually.
 //
 // Model note: using claude-sonnet-5 for quality on photo interpretation.
 // To cut cost per request, you can swap the "model" value below to
@@ -18,11 +24,18 @@ exports.handler = async (event) => {
     return { statusCode: 405, body: 'Method not allowed' };
   }
 
+  // Netlify's AI Gateway auto-injects ANTHROPIC_API_KEY and ANTHROPIC_BASE_URL
+  // into every function at runtime — no dashboard setup needed, billed through
+  // your Netlify credits. If you later add your own ANTHROPIC_API_KEY manually
+  // in Project configuration > Environment variables, Netlify stops injecting
+  // both of these and this code automatically falls back to calling Anthropic
+  // directly, billed to your own Anthropic account instead.
   const apiKey = process.env.ANTHROPIC_API_KEY;
+  const baseUrl = process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com';
   if (!apiKey) {
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'This site is missing ANTHROPIC_API_KEY. Add it in Netlify Site settings > Environment variables.' }),
+      body: JSON.stringify({ error: 'No Anthropic key available. Make sure Netlify AI features are enabled for your team, or add your own ANTHROPIC_API_KEY.' }),
     };
   }
 
@@ -85,7 +98,7 @@ Rules:
       }
     }
 
-    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+    const anthropicRes = await fetch(`${baseUrl}/v1/messages`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
