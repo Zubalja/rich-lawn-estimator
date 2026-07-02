@@ -1,0 +1,8 @@
+[build]
+  functions = "netlify/functions"
+  publish = "."
+
+[[headers]]
+  for = "/catalog.json"
+  [headers.values]
+    Cache-Control = "no-cache"

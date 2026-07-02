@@ -1,0 +1,38 @@
+{
+  "categories": [
+    { "id": "parkstrip", "name": "Park Strip Flipping", "blurb": "Reclaim the strip between sidewalk and street with rock, plants, and drip irrigation.", "items": [
+      { "id": "ps1", "name": "Sod removal & site prep", "unit": "sqft", "rate": 1.75, "desc": "Remove existing sod and prep base for rock or planting." },
+      { "id": "ps2", "name": "Weed barrier & decorative rock install", "unit": "sqft", "rate": 7.00, "desc": "Weed barrier plus rock, average grade. Rock choice may affect price." },
+      { "id": "ps3", "name": "Feature boulder", "unit": "ea", "rate": 150.00, "desc": "Delivered and placed accent boulder." },
+      { "id": "ps4", "name": "Drip line install (from existing main)", "unit": "lf", "rate": 3.25, "desc": "Drip irrigation tied into existing sprinkler lines." }
+    ]},
+    { "id": "gardenbeds", "name": "Garden Beds & Planting", "blurb": "Flower beds, mulch, steel edging, and accent trees.", "items": [
+      { "id": "gb1", "name": "Flower bed install (weed barrier + mulch)", "unit": "sqft", "rate": 10.35, "desc": "Weed barrier and premium dark mulch, prepped bed." },
+      { "id": "gb2", "name": "Perennial plant, mixed variety", "unit": "ea", "rate": 25.00, "desc": "Installed perennial, average size." },
+      { "id": "gb3", "name": "Accent tree (e.g. weeping spruce)", "unit": "ea", "rate": 350.00, "desc": "Medium specimen tree, delivered and installed." },
+      { "id": "gb4", "name": "Steel edging, patina rust 1/8\"", "unit": "lf", "rate": 5.95, "desc": "Clean, durable bed border." }
+    ]},
+    { "id": "excavation", "name": "Excavation & Site Prep", "blurb": "Grading and prep ahead of concrete, beds, or gravel.", "items": [
+      { "id": "ex1", "name": "Excavation & site prep", "unit": "day", "rate": 1732.50, "desc": "Mini excavator or hand prep for concrete, beds, and gravel areas." },
+      { "id": "ex2", "name": "Mobilization fee", "unit": "ea", "rate": 265.00, "desc": "Equipment delivery to job site." }
+    ]},
+    { "id": "drainage", "name": "Drainage", "blurb": "Keep water moving away from the house and hardscape.", "items": [
+      { "id": "dr1", "name": "Pop-up emitter install", "unit": "ea", "rate": 197.00, "desc": "Tied into existing drainage line." }
+    ]},
+    { "id": "concrete", "name": "Concrete", "blurb": "Flatwork for patios, walkways, and driveway extensions.", "items": [
+      { "id": "cn1", "name": "Concrete flatwork install", "unit": "sqft", "rate": 13.30, "desc": "Standard broom finish, pump truck included where needed." }
+    ]},
+    { "id": "xeriscape", "name": "Xeriscaping", "blurb": "Water-wise beds and irrigation for Utah's climate.", "items": [
+      { "id": "xr1", "name": "Drought-tolerant planting bed", "unit": "sqft", "rate": 12.00, "desc": "Rock, weed barrier, and drought-tolerant plant palette." },
+      { "id": "xr2", "name": "Drip irrigation line", "unit": "lf", "rate": 3.50, "desc": "Efficient point-source watering for xeric beds." }
+    ]},
+    { "id": "lawncare", "name": "Lawn Care & Maintenance", "blurb": "Keep the lawn healthy through every season.", "items": [
+      { "id": "lc1", "name": "Weekly mow & trim", "unit": "visit", "rate": 45.00, "desc": "Mow, edge, trim, and blow off." },
+      { "id": "lc2", "name": "Seasonal cleanup", "unit": "ea", "rate": 250.00, "desc": "Spring or fall yard cleanup." },
+      { "id": "lc3", "name": "Core aeration (per 1,000 sq ft)", "unit": "ea", "rate": 45.00, "desc": "Relieves compaction, improves root growth." }
+    ]},
+    { "id": "windowwell", "name": "Window Well Replacement", "blurb": "Safer, drier, better-looking basement window wells.", "items": [
+      { "id": "ww1", "name": "Standard window well replacement", "unit": "ea", "rate": 450.00, "desc": "Remove old well, install new well with proper drainage." }
+    ]}
+  ]
+}
