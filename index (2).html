@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rich Lawn & Landscape — Build Your Estimate</title>
+
+<!--
+  ============================================================
+  GOOGLE MAPS SETUP (required for the yard-measuring step)
+  ============================================================
+  1. Go to https://console.cloud.google.com/  and create a project (free).
+  2. Enable billing (Google gives $200/month free usage credit).
+  3. Enable these 3 APIs: "Maps JavaScript API", "Geocoding API", "Places API".
+  4. Go to "Credentials" -> "Create Credentials" -> "API key".
+  5. Click the key, under "Application restrictions" choose "Websites" and add
+     your Netlify domain (e.g. richlawnestimator.netlify.app and your custom domain).
+  6. Under "API restrictions" limit it to the 3 APIs above.
+  7. Paste the key below in place of YOUR_GOOGLE_MAPS_API_KEY_HERE.
+  Until you do this, the "Measure your yard" step will show a friendly
+  message and let clients skip straight to building their estimate.
+  ============================================================
+-->
+<script>
+  window.GOOGLE_MAPS_API_KEY = "YOUR_GOOGLE_MAPS_API_KEY_HERE";
+</script>
+
+<style>
+  :root{
+    --pine:#1c3b2e; --pine-dark:#122a20; --pine-line:#2c5240;
+    --sage:#6b8570; --sage-light:#dbe4d8;
+    --stone:#f6f4ee; --stone-dark:#eae6da;
+    --clay:#a85c2e; --clay-dark:#8c4a24;
+    --charcoal:#242923; --slate:#636f68; --line:#dcd7c9; --white:#ffffff;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Public Sans',ui-sans-serif,system-ui,-apple-system,sans-serif;background:var(--stone);color:var(--charcoal);}
+  button{font-family:inherit;cursor:pointer;}
+  input,select,textarea{font-family:inherit;}
+
+  .topbar{background:var(--pine);border-bottom:3px solid var(--clay);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;}
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand-name{color:#fff;font-weight:800;font-size:16px;letter-spacing:.02em;line-height:1.1;}
+  .brand-sub{color:var(--sage-light);font-size:10px;letter-spacing:.15em;line-height:1.1;}
+
+  .hidden{display:none !important;}
+  .screen{max-width:1100px;margin:0 auto;padding:28px 20px 60px;}
+  .narrow{max-width:720px;}
+
+  h1.title{color:var(--pine);font-size:26px;font-weight:800;margin:0 0 4px;}
+  .subtitle{color:var(--slate);font-size:14px;margin:0 0 22px;}
+
+  /* --- measure screen --- */
+  .measure-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:24px;}
+  .measure-input-row{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+  .measure-input-row input{flex:1;min-width:220px;border:1px solid var(--line);border-radius:8px;padding:11px 14px;font-size:14px;}
+  .btn{border:none;border-radius:8px;padding:11px 20px;font-size:14px;font-weight:600;}
+  .btn-primary{background:var(--clay);color:#fff;}
+  .btn-primary:disabled{background:var(--line);cursor:not-allowed;}
+  .btn-secondary{background:transparent;border:1px solid var(--line);color:var(--pine);}
+  .btn-ghost{background:transparent;color:var(--pine);text-decoration:underline;font-size:13px;padding:6px;}
+  #map{width:100%;height:420px;border-radius:10px;border:1px solid var(--line);margin-top:14px;display:none;}
+  .measure-readout{display:flex;align-items:center;justify-content:space-between;background:var(--stone);border-radius:8px;padding:14px 16px;margin-top:14px;display:none;}
+  .measure-readout .num{color:var(--pine);font-size:22px;font-weight:800;}
+  .maps-fallback{background:var(--stone-dark);border-radius:8px;padding:14px 16px;font-size:13px;color:var(--slate);margin-top:14px;}
+
+  .ai-divider{display:flex;align-items:center;gap:12px;margin:26px 0;color:var(--slate);font-size:12px;text-transform:uppercase;letter-spacing:.1em;}
+  .ai-divider::before,.ai-divider::after{content:'';flex:1;height:1px;background:var(--line);}
+  .ai-upload{display:flex;align-items:center;justify-content:center;border:1.5px dashed var(--line);border-radius:10px;padding:20px;text-align:center;color:var(--slate);font-size:13px;cursor:pointer;transition:border-color .15s;}
+  .ai-upload:hover{border-color:var(--clay);color:var(--clay);}
+  .ai-thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+  .ai-thumbs img{width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--line);}
+  .ai-status{margin-top:12px;font-size:13px;padding:10px 12px;border-radius:8px;}
+  .ai-status.loading{background:var(--stone-dark);color:var(--slate);}
+  .ai-status.success{background:var(--sage-light);color:var(--pine);}
+  .ai-status.error{background:#fbe4e0;color:#8c2f1f;}
+
+  .ai-locked-note{background:var(--stone-dark);color:var(--slate);border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.5;display:none;}
+  #ai-card.locked #ai-locked-note{display:block;}
+  #ai-card.locked #ai-fields{display:none;}
+
+  .manual-sqft-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px;padding-top:16px;border-top:1px solid var(--line);}
+  .manual-sqft-row input{width:120px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;}
+
+  /* --- builder layout --- */
+  .builder-wrap{display:flex;flex-wrap:wrap;}
+  .sidebar{background:var(--pine-dark);min-width:220px;flex:0 0 220px;padding:16px 0;}
+  .sidebar-label{color:var(--sage-light);padding:0 16px 8px;font-size:11px;text-transform:uppercase;letter-spacing:.15em;}
+  .cat-btn{width:100%;text-align:left;background:transparent;border:none;border-left:3px solid transparent;color:var(--sage-light);padding:10px 16px;font-size:14px;display:flex;justify-content:space-between;align-items:center;}
+  .cat-btn.active{background:var(--pine-line);border-left-color:var(--clay);color:#fff;}
+  .cat-btn:hover{background:rgba(255,255,255,.06);}
+
+  .main{flex:1;min-width:280px;padding:22px 26px;}
+  .main h2{color:var(--pine);font-size:22px;font-weight:800;margin:0 0 4px;}
+  .main .blurb{color:var(--slate);font-size:14px;margin:0 0 20px;}
+  .item-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;}
+  .item-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;}
+  .item-card.active{border-color:var(--pine);}
+  .item-name{font-weight:700;font-size:14px;margin-bottom:4px;}
+  .item-desc{color:var(--slate);font-size:12px;margin-bottom:10px;flex:1;}
+  .item-rate{color:var(--clay);font-weight:800;font-size:14px;margin-bottom:10px;}
+  .item-rate span{color:var(--slate);font-weight:400;font-size:12px;}
+  .qty-row{display:flex;align-items:center;gap:6px;}
+  .qty-btn{width:32px;height:32px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--pine);font-size:16px;display:flex;align-items:center;justify-content:center;}
+  .qty-input{flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;text-align:center;padding:7px 4px;font-size:14px;}
+  .quickfill{background:none;border:none;color:var(--clay);font-size:11px;text-decoration:underline;padding:0 0 8px;text-align:left;cursor:pointer;}
+
+  /* --- project preview (visualization) --- */
+  .preview-wrap{margin:24px 0;}
+  .preview-title{color:var(--pine);font-size:16px;font-weight:800;margin:0 0 3px;}
+  .preview-sub{color:var(--slate);font-size:12px;margin:0 0 14px;}
+  .preview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;}
+  .preview-card{background:var(--stone);border:1px solid var(--line);border-radius:10px;padding:14px;}
+  .preview-card .icon-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .preview-card .icon-badge{background:var(--pine);border-radius:8px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .preview-card .cat-name{font-weight:700;font-size:13px;color:var(--charcoal);}
+  .preview-card ul{margin:0;padding-left:0;list-style:none;font-size:11.5px;color:var(--slate);}
+  .preview-card li{padding:2px 0;}
+
+  .summary-rail{background:#fff;border-left:1px solid var(--line);flex:0 0 300px;min-width:260px;padding:20px;display:flex;flex-direction:column;}
+  .summary-rail h3{color:var(--pine);font-size:14px;font-weight:700;margin:0 0 12px;}
+  .empty-note{color:var(--slate);font-size:12px;font-style:italic;}
+  .line-item{display:flex;justify-content:space-between;font-size:12px;border-bottom:1px solid var(--line);padding:8px 0;}
+  .line-item .name{color:var(--charcoal);font-weight:600;}
+  .line-item .meta{color:var(--slate);}
+  .line-item .sub{color:var(--pine);font-weight:700;white-space:nowrap;}
+  .total-row{border-top:2px solid var(--pine);padding-top:12px;margin-top:8px;display:flex;justify-content:space-between;align-items:center;}
+  .total-label{font-size:14px;font-weight:700;}
+  .total-num{color:var(--pine);font-size:22px;font-weight:800;}
+  .rail-note{color:var(--slate);font-size:11px;margin-top:8px;}
+
+  /* --- review / saved --- */
+  .field label{display:flex;align-items:center;gap:5px;color:var(--slate);font-size:12px;margin-bottom:4px;}
+  .field input,.field textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:14px;}
+  .fields-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;}
+  @media (max-width:560px){.fields-grid{grid-template-columns:1fr;}}
+  .review-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:20px;}
+  .review-line{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px;}
+  .review-line:last-child{border-bottom:none;}
+  .back-link{color:var(--pine);font-size:13px;text-decoration:none;display:inline-flex;align-items:center;gap:5px;margin-bottom:18px;}
+
+  .print-doc{background:#fff;border:1px solid var(--line);border-radius:12px;padding:32px;}
+  .print-header{display:flex;justify-content:space-between;border-bottom:2px solid var(--pine);padding-bottom:20px;margin-bottom:20px;}
+  .print-name{color:var(--pine);font-size:20px;font-weight:800;}
+  .print-sub{color:var(--slate);font-size:12px;}
+  .disclaimer{color:var(--slate);font-size:11px;margin-top:20px;line-height:1.5;}
+
+  .toast{position:fixed;top:16px;right:16px;background:var(--pine);color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;z-index:60;box-shadow:0 4px 14px rgba(0,0,0,.2);}
+
+  @media print{
+    .topbar,.print-actions,.back-link{display:none !important;}
+    body{background:#fff;}
+    .print-doc{border:none;padding:0;}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <svg width="28" height="24" viewBox="0 0 30 26" fill="none"><path d="M2 24L10 8L14 15L17 10L28 24H2Z" fill="#dbe4d8"/></svg>
+    <div>
+      <div class="brand-name">RICH LAWN</div>
+      <div class="brand-sub">AND LANDSCAPE</div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<!-- ============ SCREEN 1: MEASURE YARD ============ -->
+<div id="screen-measure" class="screen narrow">
+  <h1 class="title">Let's measure your yard</h1>
+  <p class="subtitle">Use Google's own free measuring tool, then bring the number back here — no account needed.</p>
+
+  <div class="measure-card">
+    <div class="measure-input-row">
+      <input id="address-input" type="text" placeholder="Enter your property address" autocomplete="off">
+      <button class="btn btn-primary" id="open-maps-btn">Open Google Maps to measure</button>
+    </div>
+    <ol style="color:var(--slate);font-size:13px;line-height:1.7;margin:14px 0 0;padding-left:20px;">
+      <li>On the map that opens, right-click your property and choose <strong>Measure distance</strong>.</li>
+      <li>Click points around the edge of the area you want to work on, then click your starting point again to close the shape.</li>
+      <li>Google shows the enclosed area in square feet at the bottom of the screen.</li>
+      <li>Come back to this tab and type that number in below.</li>
+    </ol>
+
+    <div class="manual-sqft-row" style="border-top:none;margin-top:18px;padding-top:0;">
+      <span style="color:var(--slate);font-size:12px;">Area from Google Maps:</span>
+      <input type="number" id="manual-sqft-input" placeholder="Total sq ft" min="0">
+      <button class="btn btn-secondary" id="manual-sqft-btn">Use this number</button>
+    </div>
+    <div id="measure-readout" class="measure-readout">
+      <div>
+        <div style="color:var(--slate);font-size:12px;">Using</div>
+        <div class="num" id="measured-sqft">0 sq ft</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px;">
+    <button class="btn btn-primary" id="continue-with-measurement" disabled>Continue with this measurement</button>
+    <button class="btn btn-ghost" id="skip-measure">Skip — I'll enter measurements myself later</button>
+  </div>
+  <p style="color:var(--slate);font-size:11.5px;margin-top:10px;">Measurements entered here are estimates. Final pricing is confirmed once we measure your property in person.</p>
+
+  <details style="margin-top:22px;">
+    <summary style="color:var(--slate);font-size:12px;cursor:pointer;">Want to trace the yard right on this page instead? (optional, requires a Google Maps API key — see SETUP.md)</summary>
+    <div class="measure-card" style="margin-top:12px;">
+      <div class="measure-input-row">
+        <button class="btn btn-secondary" id="locate-btn">Find my property on the map</button>
+      </div>
+      <div id="maps-fallback" class="maps-fallback">
+        This isn't connected yet. The manual entry above works the same for pricing — this is purely a nicer in-page experience if you want to add it later.
+      </div>
+      <p style="color:var(--slate);font-size:12px;margin:6px 0 0;">Once the map loads: click points around your yard to trace its outline, then double-click to close the shape.</p>
+      <div id="map"></div>
+      <div id="embedded-readout" class="measure-readout">
+        <div>
+          <div style="color:var(--slate);font-size:12px;">Traced area</div>
+          <div class="num" id="embedded-sqft-display">0 sq ft</div>
+        </div>
+        <button class="btn btn-secondary" id="redraw-btn">Redraw</button>
+      </div>
+    </div>
+  </details>
+
+  <div class="ai-divider"><span>or</span></div>
+
+  <div class="measure-card locked" id="ai-card">
+    <h2 style="color:var(--pine);font-size:17px;margin:0 0 4px;">Let AI get you started</h2>
+    <p class="subtitle" style="margin-bottom:14px;">Upload a photo or two of your yard, tell us what you're picturing, and we'll suggest a starting point you can review and adjust.</p>
+
+    <div id="ai-locked-note" class="ai-locked-note">
+      🔒 Measure your yard above first — the AI assistant uses your traced square footage so its suggestions are grounded in real numbers, not a guess from the photo alone.
+    </div>
+
+    <div id="ai-fields">
+      <label class="ai-upload" id="ai-upload-label">
+        <input type="file" id="ai-photos" accept="image/*" multiple hidden>
+        <span id="ai-upload-text">Click to upload photos (up to 4)</span>
+      </label>
+      <div id="ai-thumbs" class="ai-thumbs"></div>
+
+      <textarea id="ai-description" rows="3" placeholder="e.g. I want to flip my park strip to rock and add a small patio out back" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:14px;margin-top:12px;"></textarea>
+
+      <button class="btn btn-primary" id="ai-submit" style="margin-top:12px;">Get AI suggestions</button>
+      <div id="ai-status" class="ai-status hidden"></div>
+      <p style="color:var(--slate);font-size:11px;margin-top:10px;">AI suggestions are a starting point based on your measured area, photo, and description — not a final quote. You'll review and can change everything before saving.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SCREEN 2: BUILDER ============ -->
+<div id="screen-builder" class="screen hidden" style="max-width:1400px;padding:0;">
+  <div class="builder-wrap">
+    <div class="sidebar" id="sidebar"></div>
+    <div class="main">
+      <h2 id="cat-title"></h2>
+      <p class="blurb" id="cat-blurb"></p>
+      <div class="item-grid" id="item-grid"></div>
+    </div>
+    <div class="summary-rail">
+      <h3>Your estimate</h3>
+      <div id="empty-note" class="empty-note">Add items from any category to see your running total.</div>
+      <div id="line-items" style="flex:1;overflow:auto;max-height:320px;"></div>
+      <div class="total-row">
+        <div class="total-label">Estimated total</div>
+        <div class="total-num" id="rail-total">$0</div>
+      </div>
+      <button class="btn btn-primary" id="review-btn" style="margin-top:14px;width:100%;" disabled>Review estimate</button>
+      <div class="rail-note">No cost until you approve a final quote.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SCREEN 3: REVIEW ============ -->
+<div id="screen-review" class="screen narrow hidden">
+  <a href="#" class="back-link" id="back-to-builder">&larr; Back to builder</a>
+  <h1 class="title">Review your estimate</h1>
+  <p class="subtitle">Add your contact details so we can follow up and hold this quote for you.</p>
+
+  <form id="netlify-form" name="estimate-request" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+    <input type="hidden" name="form-name" value="estimate-request">
+    <p class="hidden"><label>Don't fill this out: <input name="bot-field"></label></p>
+
+    <div class="fields-grid">
+      <div class="field"><label>Full name</label><input name="client_name" id="f-name" required></div>
+      <div class="field"><label>📍 Property address</label><input name="client_address" id="f-address" required></div>
+      <div class="field"><label>✉ Email</label><input name="client_email" id="f-email" type="email"></div>
+      <div class="field"><label>☎ Phone</label><input name="client_phone" id="f-phone" type="tel"></div>
+    </div>
+    <div class="field" style="margin-bottom:18px;">
+      <label>Notes for our team (optional)</label>
+      <textarea name="client_notes" id="f-notes" rows="3"></textarea>
+    </div>
+    <input type="hidden" name="line_items_summary" id="f-summary">
+    <input type="hidden" name="estimated_total" id="f-total">
+    <input type="hidden" name="reference_id" id="f-ref">
+
+    <div class="review-card" id="review-lines"></div>
+    <div id="review-preview"></div>
+
+    <button type="submit" class="btn btn-primary" id="save-btn" style="width:100%;padding:14px;font-size:15px;">
+      Save estimate & get reference number
+    </button>
+    <p id="save-hint" style="color:var(--slate);font-size:12px;text-align:center;margin-top:8px;">Name and address are required to save.</p>
+    <p style="color:var(--slate);font-size:11.5px;text-align:center;margin-top:6px;">This total is based on the measurements entered above. Pricing may change if actual measurements differ once we visit your property.</p>
+  </form>
+</div>
+
+<!-- ============ SCREEN 4: SAVED / PRINTABLE ============ -->
+<div id="screen-saved" class="screen narrow hidden">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;" class="print-actions">
+    <span style="background:var(--sage-light);color:var(--pine);border-radius:50%;padding:6px;">✓</span>
+    <strong id="saved-ref-label" style="color:var(--pine);font-size:14px;"></strong>
+  </div>
+  <div class="print-doc" id="print-doc"></div>
+  <div style="display:flex;gap:10px;margin-top:20px;" class="print-actions">
+    <button class="btn btn-primary" style="flex:1;" onclick="window.print()">🖨 Print / save as PDF</button>
+    <button class="btn btn-secondary" style="flex:1;" id="new-estimate-btn">Start a new estimate</button>
+  </div>
+</div>
+
+<!-- Google Maps script loads dynamically once a real key is present -->
+<script>
+/* ============================================================
+   PRICING CATALOG — loaded from catalog.json so the website and
+   the AI assistant function always read the same live pricing.
+   To change prices, edit catalog.json (not this file).
+   ============================================================ */
+let CATALOG = null;
+let allItems = [];
+
+const catalogReady = fetch('catalog.json')
+  .then((res) => res.json())
+  .then((data) => {
+    CATALOG = data;
+    allItems = CATALOG.categories.flatMap((c) => c.items.map((i) => ({ ...i, catId: c.id, catName: c.name })));
+    activeCatId = CATALOG.categories[0].id;
+  })
+  .catch(() => {
+    showToast('Could not load pricing — refresh the page and try again');
+  });
+
+const UNIT_LABELS = {sqft:'sq ft', lf:'linear ft', cy:'cubic yd', ea:'each', day:'day', visit:'visit', hr:'hour'};
+const fmt = n => n.toLocaleString('en-US', {style:'currency', currency:'USD'});
+
+/* Simple line-icon set used in the illustrated "Project preview" — one per category id */
+const CATEGORY_ICONS = {
+  parkstrip:  `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="8" cy="15" r="5"/><circle cx="16" cy="17" r="3.5"/></svg>`,
+  gardenbeds: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 21V10"/><path d="M12 10c-3 0-5-2-5-5 3 0 5 2 5 5z"/><path d="M12 10c3 0 5-2 5-5-3 0-5 2-5 5z"/></svg>`,
+  excavation: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M3 20h18"/><path d="M6 20l3-9 3 5 3-8 3 12"/></svg>`,
+  drainage:   `<svg width="18" height="18" viewBox="0 0 24 24" fill="#fff" stroke="none"><path d="M12 2C8 8 5 12 5 15a7 7 0 0014 0c0-3-3-7-7-13z"/></svg>`,
+  concrete:   `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="6" width="18" height="12" rx="1"/><path d="M3 12h18M9 6v12M15 6v12"/></svg>`,
+  xeriscape:  `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M12 12v9M8 21h8"/></svg>`,
+  lawncare:   `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M5 21c0-6 2-9 2-9M12 21c0-8 1-12 1-12M19 21c0-6-2-9-2-9"/></svg>`,
+  windowwell: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 12h16M12 4v16"/></svg>`,
+};
+
+/* Builds the illustrated "what's in this estimate" preview grid, grouped by category */
+function renderPreviewHtml(lineItems){
+  if(!lineItems.length) return '';
+  const groups = {};
+  lineItems.forEach(li => {
+    if(!groups[li.catId]) groups[li.catId] = {name: li.catName, items: []};
+    groups[li.catId].items.push(li);
+  });
+  const cards = Object.entries(groups).map(([catId, g]) => {
+    const icon = CATEGORY_ICONS[catId] || '';
+    const itemsHtml = g.items.map(i => `<li>${i.name} — ${i.qty.toLocaleString()} ${UNIT_LABELS[i.unit]}</li>`).join('');
+    return `<div class="preview-card"><div class="icon-row"><div class="icon-badge">${icon}</div><div class="cat-name">${g.name}</div></div><ul>${itemsHtml}</ul></div>`;
+  }).join('');
+  return `<div class="preview-wrap"><div class="preview-title">Project preview</div><div class="preview-sub">A visual snapshot of everything in this estimate.</div><div class="preview-grid">${cards}</div></div>`;
+}
+
+let qtys = {};
+let measuredSqFt = 0;
+let activeCatId = null;
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.remove('hidden');
+  setTimeout(()=>t.classList.add('hidden'), 2200);
+}
+
+function showScreen(id){
+  ['screen-measure','screen-builder','screen-review','screen-saved'].forEach(s=>{
+    document.getElementById(s).classList.toggle('hidden', s !== id);
+  });
+  window.scrollTo(0,0);
+}
+
+/* ---------------- MEASURE SCREEN ---------------- */
+let map, drawingManager, currentPolygon, geocoder;
+
+function initMapsIfReady(){
+  const key = window.GOOGLE_MAPS_API_KEY;
+  if(!key || key === "YOUR_GOOGLE_MAPS_API_KEY_HERE"){
+    return;
+  }
+  document.getElementById('maps-fallback').classList.add('hidden');
+  const script = document.createElement('script');
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=drawing,geometry,places&callback=onMapsLoaded`;
+  script.async = true;
+  document.head.appendChild(script);
+}
+
+window.onMapsLoaded = function(){
+  geocoder = new google.maps.Geocoder();
+  const input = document.getElementById('address-input');
+  new google.maps.places.Autocomplete(input);
+};
+
+document.getElementById('open-maps-btn').addEventListener('click', () => {
+  const address = document.getElementById('address-input').value.trim();
+  if(!address){ showToast('Enter an address first'); return; }
+  window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, '_blank');
+});
+
+document.getElementById('locate-btn').addEventListener('click', () => {
+  const address = document.getElementById('address-input').value.trim();
+  if(!address){ showToast('Enter an address first'); return; }
+  if(typeof google === 'undefined'){ showToast('This optional map isn\'t connected — use the manual entry above instead'); return; }
+
+  geocoder.geocode({address}, (results, status) => {
+    if(status !== 'OK' || !results[0]){ showToast('Could not find that address'); return; }
+    const loc = results[0].geometry.location;
+    const mapEl = document.getElementById('map');
+    mapEl.style.display = 'block';
+
+    map = new google.maps.Map(mapEl, {
+      center: loc, zoom: 20, mapTypeId: 'satellite', tilt: 0,
+    });
+
+    drawingManager = new google.maps.drawing.DrawingManager({
+      drawingMode: google.maps.drawing.OverlayType.POLYGON,
+      drawingControl: false,
+      polygonOptions: { fillColor:'#a85c2e', fillOpacity:0.25, strokeColor:'#1c3b2e', strokeWeight:3, editable:true },
+    });
+    drawingManager.setMap(map);
+
+    google.maps.event.addListener(drawingManager, 'overlaycomplete', (e) => {
+      if(currentPolygon) currentPolygon.setMap(null);
+      currentPolygon = e.overlay;
+      drawingManager.setDrawingMode(null);
+      updateMeasurement();
+      google.maps.event.addListener(currentPolygon.getPath(), 'set_at', updateMeasurement);
+      google.maps.event.addListener(currentPolygon.getPath(), 'insert_at', updateMeasurement);
+    });
+  });
+});
+
+function updateMeasurement(){
+  if(!currentPolygon) return;
+  const areaM2 = google.maps.geometry.spherical.computeArea(currentPolygon.getPath());
+  measuredSqFt = Math.round(areaM2 * 10.7639);
+  document.getElementById('embedded-sqft-display').textContent = measuredSqFt.toLocaleString() + ' sq ft';
+  document.getElementById('embedded-readout').style.display = 'flex';
+  document.getElementById('manual-sqft-input').value = measuredSqFt;
+  document.getElementById('measured-sqft').textContent = measuredSqFt.toLocaleString() + ' sq ft';
+  document.getElementById('measure-readout').style.display = 'flex';
+  document.getElementById('continue-with-measurement').disabled = false;
+  document.getElementById('ai-card').classList.remove('locked');
+}
+
+document.getElementById('redraw-btn').addEventListener('click', () => {
+  if(currentPolygon) currentPolygon.setMap(null);
+  currentPolygon = null;
+  measuredSqFt = 0;
+  document.getElementById('embedded-readout').style.display = 'none';
+  document.getElementById('measure-readout').style.display = 'none';
+  document.getElementById('continue-with-measurement').disabled = true;
+  document.getElementById('ai-card').classList.add('locked');
+  drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+});
+
+document.getElementById('continue-with-measurement').addEventListener('click', () => {
+  showToast(`Using ${measuredSqFt.toLocaleString()} sq ft as your reference measurement`);
+  goToBuilder();
+});
+document.getElementById('skip-measure').addEventListener('click', goToBuilder);
+
+document.getElementById('manual-sqft-btn').addEventListener('click', () => {
+  const val = Number(document.getElementById('manual-sqft-input').value);
+  if(!val || val <= 0){ showToast('Enter a square footage first'); return; }
+  measuredSqFt = Math.round(val);
+  document.getElementById('continue-with-measurement').disabled = false;
+  document.getElementById('ai-card').classList.remove('locked');
+  showToast(`Using ${measuredSqFt.toLocaleString()} sq ft as your reference measurement`);
+});
+
+/* ---------------- AI ASSISTANT BOX ---------------- */
+let aiImages = []; // {data: base64 (no prefix), mediaType: 'image/jpeg'}
+
+document.getElementById('ai-upload-label').addEventListener('click', () => {
+  document.getElementById('ai-photos').click();
+});
+
+document.getElementById('ai-photos').addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files).slice(0, 4);
+  aiImages = [];
+  const thumbs = document.getElementById('ai-thumbs');
+  thumbs.innerHTML = '';
+  for (const file of files) {
+    const dataUrl = await fileToDataUrl(file);
+    const [prefix, base64] = dataUrl.split(',');
+    const mediaType = prefix.match(/data:(.*);base64/)?.[1] || file.type;
+    aiImages.push({ data: base64, mediaType });
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    thumbs.appendChild(img);
+  }
+  document.getElementById('ai-upload-text').textContent = files.length
+    ? `${files.length} photo${files.length > 1 ? 's' : ''} selected`
+    : 'Click to upload photos (up to 4)';
+});
+
+function fileToDataUrl(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+document.getElementById('ai-submit').addEventListener('click', async () => {
+  const description = document.getElementById('ai-description').value.trim();
+  const statusEl = document.getElementById('ai-status');
+  if(measuredSqFt <= 0){
+    showToast('Measure your yard above first');
+    return;
+  }
+  if(!description && aiImages.length === 0){
+    showToast('Add a description or upload at least one photo');
+    return;
+  }
+  statusEl.className = 'ai-status loading';
+  statusEl.textContent = 'Looking at your yard and matching it to our services…';
+
+  try {
+    const res = await fetch('/.netlify/functions/ai-estimate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ images: aiImages, description, measuredSqFt }),
+    });
+    const result = await res.json();
+
+    if(!res.ok || result.error){
+      statusEl.className = 'ai-status error';
+      statusEl.textContent = result.error || 'Something went wrong. Try again, or build your estimate manually below.';
+      return;
+    }
+
+    await catalogReady;
+    let appliedCount = 0;
+    (result.suggestions || []).forEach((s) => {
+      if(allItems.find((i) => i.id === s.item_id)){
+        qtys[s.item_id] = s.quantity;
+        appliedCount++;
+      }
+    });
+
+    if(appliedCount === 0){
+      statusEl.className = 'ai-status error';
+      statusEl.textContent = result.summary || 'Nothing matched our current services — try describing it a different way, or build your estimate manually below.';
+      return;
+    }
+
+    statusEl.className = 'ai-status success';
+    statusEl.textContent = `${result.summary || ''} Added ${appliedCount} suggested item${appliedCount > 1 ? 's' : ''} — review and adjust below.`;
+    setTimeout(() => goToBuilder(), 900);
+  } catch (err) {
+    statusEl.className = 'ai-status error';
+    statusEl.textContent = 'Could not reach the AI assistant. Check your connection and try again.';
+  }
+});
+
+async function goToBuilder(){
+  await catalogReady;
+  if(!CATALOG){ showToast('Pricing failed to load — refresh and try again'); return; }
+  renderSidebar();
+  renderCategory(activeCatId);
+  showScreen('screen-builder');
+}
+
+/* ---------------- BUILDER SCREEN ---------------- */
+function renderSidebar(){
+  const sb = document.getElementById('sidebar');
+  sb.innerHTML = '<div class="sidebar-label">Build your yard</div>';
+  CATALOG.categories.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'cat-btn' + (c.id === activeCatId ? ' active' : '');
+    btn.innerHTML = `<span>${c.name}</span><span>›</span>`;
+    btn.onclick = () => { activeCatId = c.id; renderSidebar(); renderCategory(c.id); };
+    sb.appendChild(btn);
+  });
+}
+
+function renderCategory(catId){
+  const cat = CATALOG.categories.find(c => c.id === catId);
+  document.getElementById('cat-title').textContent = cat.name;
+  document.getElementById('cat-blurb').textContent = cat.blurb;
+  const grid = document.getElementById('item-grid');
+  grid.innerHTML = '';
+  cat.items.forEach(item => {
+    const qty = qtys[item.id] || 0;
+    const card = document.createElement('div');
+    card.className = 'item-card' + (qty > 0 ? ' active' : '');
+    const step = (item.unit === 'sqft' || item.unit === 'lf') ? 10 : 1;
+    const quickFillHtml = (item.unit === 'sqft' && measuredSqFt > 0)
+      ? `<button class="quickfill" data-act="quickfill">Use measured area (${measuredSqFt.toLocaleString()} sq ft)</button>`
+      : '';
+    card.innerHTML = `
+      <div class="item-name">${item.name}</div>
+      <div class="item-desc">${item.desc}</div>
+      <div class="item-rate">${fmt(item.rate)} <span>/ ${UNIT_LABELS[item.unit]}</span></div>
+      ${quickFillHtml}
+      <div class="qty-row">
+        <button class="qty-btn" data-act="minus">−</button>
+        <input class="qty-input" type="number" min="0" value="${qty}">
+        <button class="qty-btn" data-act="plus">+</button>
+      </div>`;
+    const input = card.querySelector('.qty-input');
+    const setQty = (v) => { qtys[item.id] = Math.max(0, v); input.value = qtys[item.id]; renderRail(); renderCategory(catId); };
+    card.querySelector('[data-act=minus]').onclick = () => setQty((qtys[item.id]||0) - step);
+    card.querySelector('[data-act=plus]').onclick = () => setQty((qtys[item.id]||0) + step);
+    input.onchange = () => setQty(Number(input.value) || 0);
+    const qfBtn = card.querySelector('[data-act=quickfill]');
+    if(qfBtn) qfBtn.onclick = () => setQty(measuredSqFt);
+    grid.appendChild(card);
+  });
+}
+
+function getLineItems(){
+  return Object.entries(qtys).filter(([,q]) => q > 0).map(([id,q]) => {
+    const item = allItems.find(i => i.id === id);
+    return item ? {...item, qty:q, subtotal: q * item.rate} : null;
+  }).filter(Boolean);
+}
+
+function renderRail(){
+  const lineItems = getLineItems();
+  const total = lineItems.reduce((s,i) => s + i.subtotal, 0);
+  document.getElementById('empty-note').style.display = lineItems.length ? 'none' : 'block';
+  const wrap = document.getElementById('line-items');
+  wrap.innerHTML = '';
+  lineItems.forEach(li => {
+    const row = document.createElement('div');
+    row.className = 'line-item';
+    row.innerHTML = `<div><div class="name">${li.name}</div><div class="meta">${li.qty} ${UNIT_LABELS[li.unit]} × ${fmt(li.rate)}</div></div><div class="sub">${fmt(li.subtotal)}</div>`;
+    wrap.appendChild(row);
+  });
+  document.getElementById('rail-total').textContent = fmt(total);
+  document.getElementById('review-btn').disabled = lineItems.length === 0;
+}
+
+document.getElementById('review-btn').addEventListener('click', () => {
+  renderReview();
+  showScreen('screen-review');
+});
+
+/* ---------------- REVIEW SCREEN ---------------- */
+function renderReview(){
+  const lineItems = getLineItems();
+  const total = lineItems.reduce((s,i) => s + i.subtotal, 0);
+  const wrap = document.getElementById('review-lines');
+  wrap.innerHTML = '';
+  lineItems.forEach(li => {
+    const row = document.createElement('div');
+    row.className = 'review-line';
+    row.innerHTML = `<div><div style="font-weight:600;">${li.name}</div><div style="color:var(--slate);font-size:12px;">${li.catName} — ${li.qty} ${UNIT_LABELS[li.unit]} × ${fmt(li.rate)}</div></div><div style="color:var(--pine);font-weight:700;">${fmt(li.subtotal)}</div>`;
+    wrap.appendChild(row);
+  });
+  const totalRow = document.createElement('div');
+  totalRow.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding-top:14px;margin-top:6px;border-top:2px solid var(--pine);';
+  totalRow.innerHTML = `<div style="font-weight:700;">Estimated total</div><div style="color:var(--pine);font-size:22px;font-weight:800;">${fmt(total)}</div>`;
+  wrap.appendChild(totalRow);
+  document.getElementById('review-preview').innerHTML = renderPreviewHtml(lineItems);
+}
+
+document.getElementById('back-to-builder').addEventListener('click', (e) => { e.preventDefault(); showScreen('screen-builder'); });
+
+const netlifyForm = document.getElementById('netlify-form');
+netlifyForm.addEventListener('submit', function(e){
+  e.preventDefault();
+  const name = document.getElementById('f-name').value.trim();
+  const address = document.getElementById('f-address').value.trim();
+  if(!name || !address){ showToast('Name and address are required'); return; }
+
+  const lineItems = getLineItems();
+  const total = lineItems.reduce((s,i) => s + i.subtotal, 0);
+  const refId = 'EST-' + Math.random().toString(36).slice(2,7).toUpperCase();
+  const summary = lineItems.map(li => `${li.name}: ${li.qty} ${UNIT_LABELS[li.unit]} x ${fmt(li.rate)} = ${fmt(li.subtotal)}`).join('\n');
+
+  document.getElementById('f-summary').value = summary;
+  document.getElementById('f-total').value = fmt(total);
+  document.getElementById('f-ref').value = refId;
+
+  const formData = new FormData(netlifyForm);
+  fetch('/', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams(formData).toString() })
+    .then(() => renderSaved(refId, total, lineItems))
+    .catch(() => { showToast('Could not submit — check your connection and try again'); });
+});
+
+/* ---------------- SAVED / PRINTABLE SCREEN ---------------- */
+function renderSaved(refId, total, lineItems){
+  document.getElementById('saved-ref-label').textContent = `Estimate saved — reference ${refId}`;
+  const name = document.getElementById('f-name').value;
+  const address = document.getElementById('f-address').value;
+  const email = document.getElementById('f-email').value;
+  const phone = document.getElementById('f-phone').value;
+  const notes = document.getElementById('f-notes').value;
+
+  const linesHtml = lineItems.map(li => `
+    <div class="review-line">
+      <div><div style="font-weight:600;">${li.name}</div><div style="color:var(--slate);font-size:12px;">${li.qty} ${UNIT_LABELS[li.unit]} × ${fmt(li.rate)}</div></div>
+      <div style="color:var(--pine);font-weight:700;">${fmt(li.subtotal)}</div>
+    </div>`).join('');
+
+  document.getElementById('print-doc').innerHTML = `
+    <div class="print-header">
+      <div><div class="print-name">Rich Lawn & Landscape</div><div class="print-sub">Ogden, UT 84405 · (801) 917-4510 · rich@richlawnandlandscape.com</div></div>
+      <div style="text-align:right;"><div class="print-sub">Estimate reference</div><div style="font-weight:700;">${refId}</div><div class="print-sub">${new Date().toLocaleDateString()}</div></div>
+    </div>
+    <div class="fields-grid" style="margin-bottom:20px;">
+      <div><div class="print-sub">Prepared for</div><div style="font-weight:600;">${name}</div><div>${address}</div></div>
+      <div><div class="print-sub">Contact</div><div>${email}</div><div>${phone}</div></div>
+    </div>
+    ${linesHtml}
+    <div style="display:flex;justify-content:space-between;align-items:center;padding-top:16px;margin-top:12px;border-top:2px solid var(--pine);">
+      <div style="font-weight:700;">Estimated total</div><div style="color:var(--pine);font-size:26px;font-weight:800;">${fmt(total)}</div>
+    </div>
+    ${notes ? `<div style="margin-top:16px;font-size:12px;color:var(--slate);"><strong>Notes:</strong> ${notes}</div>` : ''}
+    ${renderPreviewHtml(lineItems)}
+    <div class="disclaimer">This is a self-service estimate, not a final invoice. Measurements entered or traced on this site are estimates only — final pricing may change once we've confirmed exact measurements and site conditions in person. Final pricing may also vary based on material availability and material selection, and will be confirmed by our team before work begins. Valid for 60 days.</div>
+  `;
+  showScreen('screen-saved');
+}
+
+document.getElementById('new-estimate-btn').addEventListener('click', () => {
+  qtys = {}; measuredSqFt = 0; aiImages = [];
+  document.getElementById('address-input').value = '';
+  document.getElementById('manual-sqft-input').value = '';
+  document.getElementById('measure-readout').style.display = 'none';
+  document.getElementById('embedded-readout').style.display = 'none';
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-address').value = '';
+  document.getElementById('f-email').value = '';
+  document.getElementById('f-phone').value = '';
+  document.getElementById('f-notes').value = '';
+  document.getElementById('ai-description').value = '';
+  document.getElementById('ai-thumbs').innerHTML = '';
+  document.getElementById('ai-upload-text').textContent = 'Click to upload photos (up to 4)';
+  document.getElementById('ai-status').className = 'ai-status hidden';
+  document.getElementById('ai-card').classList.add('locked');
+  document.getElementById('continue-with-measurement').disabled = true;
+  document.getElementById('measure-readout').style.display = 'none';
+  showScreen('screen-measure');
+});
+
+/* init */
+initMapsIfReady();
+</script>
+</body>
+</html>
